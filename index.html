@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <link rel="manifest" href="data:application/manifest+json;charset=utf-8,%7B%22name%22%3A%22Movie%20Tracker%22%2C%22short_name%22%3A%22Movies%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23f8f9fa%22%2C%22theme_color%22%3A%22%23ffffff%22%7D">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>Movie Tracker</title>
+  
+  <style>
+    /* ALL YOUR EXISTING CSS STAYS EXACTLY THE SAME */
+    :root { --primary: #2563eb; --bg: #f8f9fa; --card-bg: #ffffff; --text-main: #1f2937; --text-sub: #6b7280; --border: #e5e7eb; --jon-color: #22c55e; --jon-bg: #dcfce7; --val-color: #eab308; --val-bg: #fef9c3; }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { margin: 0; background-color: var(--bg); color: var(--text-main); padding-bottom: 70px; -webkit-tap-highlight-color: transparent; }
+    header { background: var(--card-bg); padding: 16px; position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--border); }
+    h1 { margin: 0 0 12px 0; font-size: 24px; display: flex; justify-content: space-between; align-items: center; }
+    .filter-row { display: flex; gap: 8px; width: 100%; }
+    .search-bar { flex: 1; padding: 12px 16px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg); font-size: 15px; outline: none; }
+    .search-bar:focus, .genre-filter:focus { border-color: var(--primary); }
+    .genre-filter { width: 120px; padding: 12px 10px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg); font-size: 14px; outline: none; }
+    .stats { font-size: 14px; color: var(--text-sub); margin-bottom: 8px; display: none; }
+    main { padding: 16px; }
+    .card { background: var(--card-bg); border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; transition: 0.2s; }
+    .card-header { display: flex; justify-content: space-between; align-items: flex-start; }
+    .movie-title { font-size: 18px; font-weight: 600; margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px; }
+    .movie-genre { font-size: 14px; color: var(--text-sub); margin: 0; }
+    .badge { width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; flex-shrink: 0; }
+    .badge-j { background: var(--jon-bg); color: var(--jon-color); }
+    .badge-v { background: var(--val-bg); color: var(--val-color); }
+    .card-details { display: none; margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px; font-size: 14px; }
+    .card.expanded .card-details { display: block; }
+    .detail-row { margin-bottom: 8px; line-height: 1.4; }
+    .detail-label { font-weight: 600; color: var(--text-main); }
+    .btn-group { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+    button { padding: 10px 16px; border-radius: 8px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-outline { background: transparent; border: 1px solid var(--primary); color: var(--primary); }
+    .btn-fab { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; padding: 0; }
+    nav { position: fixed; bottom: 0; left: 0; right: 0; height: 65px; background: var(--card-bg); border-top: 1px solid var(--border); display: flex; justify-content: space-around; align-items: center; z-index: 10; padding-bottom: env(safe-area-inset-bottom); }
+    .nav-item { display: flex; flex-direction: column; align-items: center; font-size: 12px; color: var(--text-sub); text-decoration: none; padding: 8px; }
+    .nav-item.active { color: var(--primary); font-weight: 600; }
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 50; }
+    .modal { background: var(--card-bg); width: 90%; max-width: 400px; border-radius: 16px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    .modal h2 { margin: 0 0 16px 0; font-size: 20px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; margin-bottom: 6px; font-size: 14px; font-weight: 600; }
+    .form-group select, .form-group input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); font-size: 16px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
+    #loader { display: none; text-align: center; padding: 40px; color: var(--text-sub); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Movie Tracker <button class="btn-primary btn-fab" onclick="openModal('addMovieModal')">+</button></h1>
+    <div class="stats" id="watchedStats">Jon: 0 | Valerie: 0</div>
+    <div class="filter-row">
+      <input type="text" class="search-bar" id="searchInput" placeholder="Search movies..." onkeyup="renderList()">
+      <select id="genreFilter" class="genre-filter" onchange="renderList()">
+        <option value="">All Genres</option>
+      </select>
+    </div>
+  </header>
+
+  <main id="appContent"></main>
+  <div id="loader">Loading...</div>
+
+  <nav>
+    <div class="nav-item active" onclick="switchTab('movies')" id="tab-movies">Movies</div>
+    <div class="nav-item" onclick="switchTab('watchlist')" id="tab-watchlist">Watchlist</div>
+    <div class="nav-item" onclick="switchTab('watched')" id="tab-watched">Watched</div>
+  </nav>
+
+  <div class="modal-overlay" id="addMovieModal">
+    <div class="modal">
+      <h2>Add New Movie</h2>
+      <div class="form-group">
+        <label>Movie Title</label>
+        <input type="text" id="newMovieTitle" placeholder="e.g. Inception">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-outline" onclick="closeModal('addMovieModal')">Cancel</button>
+        <button class="btn-primary" onclick="addMovie()">Auto-fill with AI</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="actionModal">
+    <div class="modal">
+      <h2 id="actionModalTitle">Action</h2>
+      <input type="hidden" id="actionMovieName">
+      <input type="hidden" id="actionTargetList">
+      <div class="form-group" id="whoChoseGroup">
+        <label>Who Chose?</label>
+        <select id="whoChoseSelect">
+          <option value="">-</option>
+          <option value="Jon">Jon</option>
+          <option value="Valerie">Valerie</option>
+        </select>
+      </div>
+      <div class="form-group" id="dateWatchedGroup" style="display:none;">
+        <label>Date Watched</label>
+        <input type="date" id="dateWatchedInput">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-outline" onclick="closeModal('actionModal')">Cancel</button>
+        <button class="btn-primary" onclick="submitAction()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // PASTE YOUR GOOGLE APPS SCRIPT URL HERE:
+    const API_URL = "https://script.google.com/macros/s/AKfycbw6M4LSAxPuBXj1dYKg2DClqgvrw3Yi5N2TTrx1UTheruAmb0ur0BuXgx0O0RpHHEG1/exec";
+    
+    let movieData = [];
+    let currentTab = 'movies';
+
+    // Initialize: Fetch movies from API
+    document.getElementById('loader').style.display = 'block';
+    
+    fetch(`${API_URL}?action=getMovies`)
+      .then(response => response.json())
+      .then(data => {
+        movieData = data;
+        movieData.sort((a, b) => a.Movie.localeCompare(b.Movie));
+        document.getElementById('loader').style.display = 'none';
+        populateGenres();
+        renderList();
+      })
+      .catch(err => {
+        document.getElementById('loader').innerText = "Error loading movies.";
+        console.error(err);
+      });
+
+    // ALL OF YOUR EXISTING RENDER LOGIC
+    function populateGenres() {
+      const select = document.getElementById('genreFilter');
+      const genres = new Set();
+      movieData.forEach(m => { if (m.Genre) genres.add(m.Genre.trim()); });
+      Array.from(genres).filter(Boolean).sort().forEach(g => {
+        const opt = document.createElement('option'); opt.value = g; opt.textContent = g; select.appendChild(opt);
+      });
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      document.getElementById(`tab-${tab}`).classList.add('active');
+      document.getElementById('watchedStats').style.display = (tab === 'watched') ? 'block' : 'none';
+      document.getElementById('searchInput').value = '';
+      renderList();
+    }
+
+    function renderList() {
+      const container = document.getElementById('appContent');
+      const searchQuery = document.getElementById('searchInput').value.toLowerCase();
+      const genreQuery = document.getElementById('genreFilter').value;
+      let filtered = movieData;
+
+      if (currentTab === 'movies') filtered = filtered.filter(m => !(m.List && m.List.trim().toLowerCase() === 'watched'));
+      else if (currentTab === 'watchlist') filtered = filtered.filter(m => m.List && m.List.trim().toLowerCase() === 'watchlist');
+      else if (currentTab === 'watched') { filtered = filtered.filter(m => m.List && m.List.trim().toLowerCase() === 'watched'); updateStats(filtered); }
+
+      if (genreQuery) filtered = filtered.filter(m => m.Genre && m.Genre.trim() === genreQuery);
+      if (searchQuery) filtered = filtered.filter(m => (m.Movie && m.Movie.toLowerCase().includes(searchQuery)) || (m.Genre && m.Genre.toLowerCase().includes(searchQuery)));
+
+      if (filtered.length === 0) { container.innerHTML = '<p style="text-align:center; color: #6b7280; margin-top:40px;">No movies found.</p>'; return; }
+
+      container.innerHTML = filtered.map((m) => {
+        const listTarget = m.List ? m.List.trim() : '';
+        const badge = getBadgeHTML(m['Who Chose'], listTarget);
+        return `
+          <div class="card" onclick="toggleCard(this)">
+            <div class="card-header">
+              <div>
+                <h3 class="movie-title">${m.Movie} ${badge}</h3>
+                <p class="movie-genre">${m.Genre || 'Unknown Genre'}</p>
+              </div>
+            </div>
+            <div class="card-details" onclick="event.stopPropagation()">
+              <div class="detail-row"><span class="detail-label">Year:</span> ${m.Year}</div>
+              <div class="detail-row"><span class="detail-label">Run Time:</span> ${m['Run Time']}</div>
+              <div class="detail-row"><span class="detail-label">Cast:</span> ${m.Cast}</div>
+              <div class="detail-row"><span class="detail-label">Synopsis:</span> ${m.Synopsis}</div>
+              <div class="btn-group">
+                ${listTarget.toLowerCase() !== 'watchlist' && listTarget.toLowerCase() !== 'watched' ? `<button class="btn-outline" onclick="openActionModal('${m.Movie.replace(/'/g, "\\'")}', 'Watchlist')">Add to Watchlist</button>` : ''}
+                ${listTarget.toLowerCase() !== 'watched' ? `<button class="btn-primary" onclick="openActionModal('${m.Movie.replace(/'/g, "\\'")}', 'Watched')">Mark as Watched</button>` : ''}
+                ${(listTarget.toLowerCase() === 'watchlist' || listTarget.toLowerCase() === 'watched') ? `<button class="btn-outline" onclick="removeFromList('${m.Movie.replace(/'/g, "\\'")}')">Remove from List</button>` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function getBadgeHTML(whoChose, listTarget) {
+      if (!listTarget || listTarget === '') return '';
+      if (whoChose && whoChose.trim() === 'Jon') return '<span class="badge badge-j">J</span>';
+      if (whoChose && whoChose.trim() === 'Valerie') return '<span class="badge badge-v">V</span>';
+      return '';
+    }
+
+    function toggleCard(element) { element.classList.toggle('expanded'); }
+    function updateStats(watchedMovies) {
+      let jonCount = 0; let valCount = 0;
+      watchedMovies.forEach(m => { if (m['Who Chose'] === 'Jon') jonCount++; if (m['Who Chose'] === 'Valerie') valCount++; });
+      document.getElementById('watchedStats').innerText = `Jon: ${jonCount} | Valerie: ${valCount}`;
+    }
+
+    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+    function openActionModal(movieName, targetList) {
+      document.getElementById('actionMovieName').value = movieName;
+      document.getElementById('actionTargetList').value = targetList;
+      document.getElementById('actionModalTitle').innerText = targetList === 'Watched' ? 'Mark as Watched' : 'Add to Watchlist';
+      document.getElementById('whoChoseSelect').value = "";
+      document.getElementById('dateWatchedGroup').style.display = targetList === 'Watched' ? 'block' : 'none';
+      if (targetList === 'Watched') document.getElementById('dateWatchedInput').valueAsDate = new Date();
+      openModal('actionModal');
+    }
+
+    // New Fetch API for Updates
+    function updateBackend(action, dataObj) {
+      return fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // 'text/plain' prevents CORS blocking
+        body: JSON.stringify({ action: action, ...dataObj })
+      }).then(res => res.json());
+    }
+
+    function submitAction() {
+      const movie = document.getElementById('actionMovieName').value;
+      const target = document.getElementById('actionTargetList').value;
+      const whoChose = document.getElementById('whoChoseSelect').value;
+      const date = target === 'Watched' ? document.getElementById('dateWatchedInput').value : '';
+
+      closeModal('actionModal');
+      document.getElementById('loader').style.display = 'block';
+
+      updateBackend('updateMovie', { movieName: movie, listTarget: target, whoChose: whoChose, dateWatched: date })
+        .then(() => {
+          const idx = movieData.findIndex(m => m.Movie === movie);
+          if(idx > -1) { movieData[idx].List = target; movieData[idx]['Who Chose'] = whoChose; movieData[idx]['Date Watched'] = date; }
+          document.getElementById('loader').style.display = 'none';
+          renderList();
+        });
+    }
+
+    function removeFromList(movie) {
+      document.getElementById('loader').style.display = 'block';
+      updateBackend('updateMovie', { movieName: movie, listTarget: '', whoChose: '', dateWatched: '' })
+        .then(() => {
+          const idx = movieData.findIndex(m => m.Movie === movie);
+          if(idx > -1) { movieData[idx].List = ''; movieData[idx]['Who Chose'] = ''; movieData[idx]['Date Watched'] = ''; }
+          document.getElementById('loader').style.display = 'none';
+          renderList();
+        });
+    }
+
+    function addMovie() {
+      const title = document.getElementById('newMovieTitle').value;
+      if (!title) return;
+      closeModal('addMovieModal');
+      document.getElementById('newMovieTitle').value = '';
+      document.getElementById('loader').style.display = 'block';
+      
+      updateBackend('addMovie', { movieName: title })
+        .then(movieObj => {
+          movieData.push(movieObj);
+          movieData.sort((a, b) => a.Movie.localeCompare(b.Movie));
+          document.getElementById('loader').style.display = 'none';
+          if (movieObj.Genre) {
+             const select = document.getElementById('genreFilter');
+             if (!Array.from(select.options).some(opt => opt.value === movieObj.Genre)) {
+               const opt = document.createElement('option'); opt.value = movieObj.Genre; opt.textContent = movieObj.Genre; select.appendChild(opt);
+             }
+          }
+          renderList();
+        });
+    }
+  </script>
+</body>
+</html>
